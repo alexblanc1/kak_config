@@ -8,6 +8,21 @@ hook global InsertChar j %{ try %{
 }}
 
 # Multi-curseur sur le mot courant (venait du ThinkPad, commenté côté Mac)
+# La commande n'existe pas dans Kakoune ni dans les plugins : elle était appelée
+# par le mapping sans avoir jamais été définie. On la définit ici.
+#   1er appel  → sélectionne le mot sous le curseur et l'arme comme motif de recherche
+#   appels suivants → ajoutent un curseur sur l'occurrence suivante
+# -save-regs '' est obligatoire : par défaut execute-keys restaure le registre /,
+# ce qui annulerait le * et ferait échouer le N suivant sur « no search pattern ».
+define-command select-or-add-cursor -docstring "curseur supplémentaire sur l'occurrence suivante du mot" %{
+    try %{
+        execute-keys -draft '<a-k>\A.\z<ret>'
+        execute-keys -save-regs '' '<a-i>w*'
+    } catch %{
+        execute-keys N
+    }
+}
+
 map global normal <c-d> ': select-or-add-cursor<ret>' -docstring 'curseur sur le mot suivant'
 
 # ctags — mappés seulement si ctags est installé

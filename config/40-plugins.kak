@@ -63,12 +63,22 @@ plug "https://github.com/occivink/kakoune-filetree.git" config %{
 }
 
 plug 'delapouite/kakoune-buffers' config %{
+    # Rappel : dans Kakoune (à l'inverse de Vim) Q enregistre et q rejoue.
+    # Donc ^ = rejouer, <a-^> = enregistrer.
     map global normal ^     q
     map global normal <a-^> Q
     map global normal q     b
     map global normal Q     B
     map global normal <a-q> <a-b>
     map global normal <a-Q> <a-B>
+
+    # ^ est une touche morte en AZERTY : seule, elle n'envoie rien au terminal
+    # (il faut ^ puis Espace), et <a-^> est en pratique inatteignable — donc
+    # impossible d'enregistrer une macro. Doublons directement tapables.
+    # Obligatoirement en mode normal : depuis le mode user, l'enregistrement
+    # s'arrête dès que le mode se dépile, la macro reste vide.
+    map global normal <c-q> Q -docstring 'enregistrer / arrêter une macro'
+    map global normal <c-p> q -docstring 'rejouer la macro'
     map global normal b ': enter-buffers-mode<ret>'            -docstring 'buffers'
     map global normal B ': enter-user-mode -lock buffers<ret>' -docstring 'buffers (lock)'
     map global user   b ': enter-user-mode buffers<ret>'       -docstring 'choisir un buffer'

@@ -152,7 +152,11 @@ xclip                     (X11, repli)
 ### `30-mappings.kak` — raccourcis et hooks
 
 - `jj` en mode insertion → `<esc>` (via un hook `InsertChar`).
-- `<c-d>` → curseur supplémentaire sur l'occurrence suivante du mot.
+- Commande `select-or-add-cursor`, mappée sur `<c-d>` : le premier appel sélectionne
+  le mot sous le curseur et l'arme comme motif de recherche, les suivants ajoutent
+  un curseur sur l'occurrence suivante. Elle est **définie ici** : ce n'est ni un
+  builtin Kakoune ni une commande de plugin, et le mapping l'appelait sans qu'elle
+  existe nulle part.
 - Les mappings ctags ne sont créés **que si** `ctags` est installé.
 - Objet texte `e` pour les environnements LaTeX (`\begin{…}` … `\end{…}`).
 - Commande `latex-build` : écrit le buffer, lance `pdflatex -interaction=nonstopmode`
@@ -174,7 +178,7 @@ lean) est désormais **toujours installé, mais activé conditionnellement**.
 | Touche | Mode | Action |
 |---|---|---|
 | `jj` | insertion | échap |
-| `<c-d>` | normal | curseur sur l'occurrence suivante du mot |
+| `<c-d>` | normal | curseur sur l'occurrence suivante du mot (écrase le défilement d'une demi-page natif) |
 | `<space>p` / `<space>P` | normal | coller depuis le presse-papier système (après / avant) |
 | `<a-space>` | normal | entrer dans le mode **easymotion** |
 | `<space>f` | normal | ouvrir **filetree** |
@@ -187,11 +191,22 @@ Le plugin déplace les mappings natifs pour libérer `b` et `B` :
 |---|---|---|
 | `b` | mode buffers | ~~mot précédent~~ |
 | `B` | mode buffers verrouillé | ~~mot précédent (WORD)~~ |
-| `q` / `Q` | mot précédent / WORD précédent | ~~enregistrer / rejouer une macro~~ |
+| `q` / `Q` | mot précédent / WORD précédent | ~~rejouer / enregistrer une macro~~ |
 | `<a-q>` / `<a-Q>` | variantes `<a-b>` / `<a-B>` | — |
-| `^` / `<a-^>` | enregistrer / rejouer une macro | — |
+| `^` / `<a-^>` | rejouer / enregistrer une macro | — |
+| `<c-p>` / `<c-q>` | rejouer / enregistrer une macro (doublons AZERTY) | — |
 | `<space>b` | choisir un buffer | — |
 | `<space>v` | choisir un buffer (mode verrouillé) | — |
+
+⚠️ Dans Kakoune, contrairement à Vim, **`Q` enregistre et `q` rejoue**. Le tableau
+ci-dessus suit cette convention : `^` rejoue, `<a-^>` enregistre.
+
+En AZERTY, `^` est une **touche morte** : seule, elle n'envoie rien au terminal
+(il faut faire `^` puis Espace), et `<a-^>` est en pratique inatteignable — donc
+impossible d'enregistrer quoi que ce soit, et `^` échoue alors sur
+`register '@' is empty`. D'où les doublons `<c-q>` / `<c-p>`, directement tapables.
+Ils sont mappés en **mode normal** et pas en mode user : depuis le mode user,
+l'enregistrement s'interrompt dès que le mode se dépile et la macro reste vide.
 
 ### Easymotion (`<a-space>`, puis)
 
