@@ -1,81 +1,280 @@
 # Config Kakoune — ThinkPad + Mac
 
-Une seule configuration, un seul dépôt, pour Linux et macOS. Aucune ligne à
-commenter/décommenter en changeant de machine : tout ce qui diffère est détecté
-à l'exécution.
+> Une seule configuration, un seul dépôt, deux machines.
+> Rien à commenter/décommenter en changeant d'OS : tout ce qui diffère est
+> détecté à l'exécution.
+
+---
+
+## Sommaire
+
+- [Principe](#principe)
+- [Installation](#installation)
+- [Arborescence](#arborescence)
+- [Les modules en détail](#les-modules-en-détail)
+- [Aide-mémoire des raccourcis](#aide-mémoire-des-raccourcis)
+- [Plugins](#plugins)
+- [Thèmes](#thèmes)
+- [Dépendances optionnelles](#dépendances-optionnelles)
+- [Note macOS](#note-macos)
+- [Personnaliser sans casser le partage](#personnaliser-sans-casser-le-partage)
+- [Historique : ce qui bloquait le partage](#historique--ce-qui-bloquait-le-partage)
+
+---
+
+## Principe
+
+Trois règles tiennent toute la config :
+
+1. **`kakrc` ne contient aucun réglage.** Il ne fait qu'ordonner les modules de
+   `config/`, dans l'ordre alphabétique.
+2. **Aucun chemin absolu, aucun binaire codé en dur.** Le préfixe Kakoune, le
+   presse-papier, le LSP et ctags sont détectés au démarrage et exposés comme
+   options (`%opt{os}`, `%opt{kak_prefix}`, `%opt{has_lsp}`, `%opt{has_ctags}`).
+3. **Rien de spécifique à une machine n'est versionné.** Les symlinks, les
+   plugins compilés et les surcharges perso vivent hors du dépôt (`.gitignore`).
+
+Conséquence : `git pull && sh install.sh` suffit sur n'importe quelle machine.
+
+---
 
 ## Installation
 
 ```sh
-git clone <ce-dépôt> ~/dotfiles/kak
+git clone git@github.com:alexblanc1/kak_config.git ~/dotfiles/kak
 sh ~/dotfiles/kak/install.sh
-kak   # puis :plug-install
+kak            # puis, dans Kakoune :
+:plug-install
 ```
 
-`install.sh` lie le dépôt sur `~/.config/kak`, recrée le symlink
-`autoload/standard-library` vers l'installation Kakoune locale, clone `plug.kak`
-et signale les dépendances manquantes.
+`install.sh` est **idempotent** — on peut le relancer après chaque `git pull`.
+Il enchaîne cinq étapes :
+
+| # | Étape | Détail |
+|---|---|---|
+| 1 | Lien du dépôt | `~/.config/kak` → le dépôt cloné (sauvegarde en `.bak` si un vrai dossier existe déjà) |
+| 2 | Détection de Kakoune | résout les symlinks de `command -v kak` pour en déduire le préfixe d'installation |
+| 3 | Bibliothèque standard | recrée `autoload/standard-library` → `<prefix>/share/kak/rc` |
+| 4 | Amorçage de plug.kak | clone `plug.kak` s'il manque, `chmod +x` sur `bin/change-theme.pl` |
+| 5 | Diagnostic | avertit pour chaque dépendance optionnelle absente |
+
+> **Pourquoi l'étape 3 ?** Dès qu'un dossier `autoload/` existe dans la config,
+> Kakoune cesse d'autocharger sa bibliothèque standard. Il faut donc la lier
+> explicitement — et ce lien, propre à chaque machine, n'est pas versionné.
+
+---
 
 ## Arborescence
 
 ```
-kakrc                      point d'entrée, ne fait que sourcer les modules
-config/00-platform.kak     détection OS, préfixe Kakoune, LSP, ctags
-config/10-options.kak      options globales et affichage
-config/20-clipboard.kak    presse-papier système, multiplateforme
-config/30-mappings.kak     raccourcis et hooks hors plugins
-config/40-plugins.kak      plug.kak + tous les plugins
-config/local/darwin.kak    surcharges macOS (versionnées)
-config/local/linux.kak     surcharges Linux (versionnées)
-local.kak                  surcharges de CETTE machine (non versionné)
-bin/change-theme.pl        sélecteur de thème, portable
-install.sh                 bootstrap
+kakrc                       point d'entrée — ne fait que sourcer les modules
+│
+├── config/
+│   ├── 00-platform.kak     détection OS, préfixe Kakoune, LSP, ctags
+│   ├── 10-options.kak      options globales et affichage
+│   ├── 20-clipboard.kak    presse-papier système, multiplateforme
+│   ├── 30-mappings.kak     raccourcis et hooks hors plugins
+│   ├── 40-plugins.kak      plug.kak + tous les plugins
+│   └── local/
+│       ├── darwin.kak      surcharges macOS      (versionnées)
+│       └── linux.kak       surcharges Linux      (versionnées)
+│
+├── local.kak               surcharges de CETTE machine (NON versionné)
+├── bin/change-theme.pl     sélecteur de thème, portable
+├── install.sh              bootstrap
+│
+├── autoload/               standard-library → symlink, non versionné
+├── colors/                 thèmes ; colors/kakoune → symlink, non versionné
+└── plugins/                géré par plug.kak, non versionné
 ```
 
-Ordre de chargement : `config/*.kak` par ordre alphabétique, puis
-`config/local/<uname>.kak`, puis `local.kak` s'il existe.
+**Ordre de chargement**
+
+```
+config/*.kak (alphabétique)  →  config/local/<uname>.kak  →  local.kak
+```
+
+Chaque étage peut écraser la précédente. `local.kak` a donc toujours le dernier
+mot, et comme il est gitignoré, il ne pollue jamais l'autre machine.
 
 ---
 
-## Ce qui bloquait le partage entre les deux machines
+## Les modules en détail
 
-| Problème | Ancien état | Résolution |
+### `00-platform.kak` — la couche de détection
+
+Déclare quatre options globales sur lesquelles tout le reste s'appuie :
+
+| Option | Type | Contenu |
 |---|---|---|
-| `autoload/standard-library` | symlink en dur vers `/opt/homebrew/Cellar/kakoune/2026.05.21/share/kak/rc` (Mac) — cassé sur le ThinkPad, et re-cassé à chaque mise à jour de Kakoune | gitignoré, recréé par `install.sh` à partir du binaire `kak` résolu |
-| `change-theme.pl` | shebang `/home/linuxbrew/.linuxbrew/bin/env` d'un côté, chemin de thèmes `/opt/homebrew/share/kak/colors` de l'autre | shebang `/usr/bin/env perl`, préfixe déduit de `command -v kak` |
-| Presse-papier | `xsel` en dur + kakboard (doublon) sur le ThinkPad ; **rien** sur le Mac | détection à l'exécution : `pbcopy` → `wl-copy` → `xsel` → `xclip` |
-| `plugins/` versionné | des milliers de fichiers vendorisés, plus des `.build/*/hooks` contenant `/Users/blancalexandre/…` et `/home/alex/…` | gitignoré, reconstruit par `:plug-install` |
-| `colors/kakoune` | symlink absolu créé par le hook de build catppuccin | gitignoré |
-| LSP / wiki / lean | actifs sur le ThinkPad, **commentés** sur le Mac | plugins installés dans les deux cas ; LSP activé si le binaire existe, wiki activé si `~/wiki` existe |
+| `os` | `str` | `darwin`, `linux`, … (`uname` en minuscules) |
+| `kak_prefix` | `str` | préfixe d'installation de Kakoune, déduit de `command -v kak` |
+| `has_lsp` | `bool` | `true` si `kak-lsp` **ou** `kakoune-lsp` est dans le `PATH` |
+| `has_ctags` | `bool` | `true` si `ctags` est dans le `PATH` |
 
-## Fusion des réglages
+La résolution des symlinks est faite à la main (boucle `readlink`) plutôt qu'avec
+`realpath`, absent des macOS antérieurs à 12.
 
-**Repris du ThinkPad :** `wrap -word -indent`, `<c-d>` multi-curseur, mappings
-ctags (`<a-=>`, `<space>t`), objet texte `e` pour les environnements LaTeX,
-kakoune-buffers avec la permutation `^`/`q`, kakoune-lsp, kakoune-wiki, lean.kak.
+### `10-options.kak` — affichage et édition
 
-**Repris du Mac :** la config de kakoune-filetree (`<space>f`, arbre dans la
-fenêtre courante, `toolsclient`/`jumpclient` volontairement vides),
-auto-pairs.kak.
+| Réglage | Valeur |
+|---|---|
+| Numéros de ligne | `number-lines -relative` |
+| Espaces | `show-whitespaces` |
+| Retour à la ligne | `wrap -word -indent` |
+| Indentation | `indentwidth 4`, `tabstop 4` |
+| Marge de défilement | `scrolloff 3,3` |
+| Assistant | `ncurses_assistant=dilbert` |
+| Modeline | `nom-du-buffer ligne:colonne {context} {mode}` |
+| `toolsclient` / `jumpclient` | **vides, volontairement** |
 
-**Commun aux deux, conservé tel quel :** `number-lines -relative`,
-`show-whitespaces`, `indentwidth 4`, `ncurses_assistant=dilbert`, `modelinefmt`,
-`jj` → échap, easymotion avec tes faces et tes mappings bidirectionnels,
-text-objects, auto-percent, shellcheck, catppuccin_latte.
+> Laisser `toolsclient` et `jumpclient` vides garde les outils (filetree, grep,
+> LSP…) dans la fenêtre courante, au lieu d'aller chercher un client tmux qui
+> n'existe pas forcément.
 
-## Trois changements de comportement assumés
+### `20-clipboard.kak` — presse-papier système
 
-1. **`<c-w>`** ne lance plus `pdflatex` sur tous les buffers. L'ancien hook
-   `RawKey` global compilait n'importe quel fichier ouvert ; le raccourci n'est
-   désormais mappé que dans les buffers `filetype=latex`, via une commande
-   `latex-build` qui remonte les erreurs au lieu de les avaler.
-2. **kakboard n'est plus chargé.** Il faisait doublon avec le hook
-   `RegisterModified` et ne marchait qu'en X11. La ligne pour le remettre est
-   dans `config/local/linux.kak`.
-3. **`<space>p` / `<space>P`** collent depuis le presse-papier système. Rien
-   n'existait pour ça auparavant, et `p`/`P` natifs restent intacts.
+L'outil est choisi **au démarrage**, dans cet ordre :
+
+```
+pbcopy / pbpaste          (macOS)
+wl-copy / wl-paste        (Wayland, si $WAYLAND_DISPLAY est défini)
+xsel                      (X11)
+xclip                     (X11, repli)
+```
+
+- Un hook `RegisterModified '"'` pousse **tout yank** vers le presse-papier système.
+- `<space>p` / `<space>P` collent depuis le presse-papier système ; `p` / `P`
+  natifs de Kakoune restent intacts.
+- Si aucun outil n'est trouvé, les commandes échouent proprement avec un message
+  au lieu de casser la config.
+
+### `30-mappings.kak` — raccourcis et hooks
+
+- `jj` en mode insertion → `<esc>` (via un hook `InsertChar`).
+- `<c-d>` → curseur supplémentaire sur l'occurrence suivante du mot.
+- Les mappings ctags ne sont créés **que si** `ctags` est installé.
+- Objet texte `e` pour les environnements LaTeX (`\begin{…}` … `\end{…}`).
+- Commande `latex-build` : écrit le buffer, lance `pdflatex -interaction=nonstopmode`
+  et **remonte le résultat** (`{Information}` ou `{Error}`) au lieu de l'avaler.
+  Mappée sur `<c-w>`, **uniquement dans les buffers `filetype=latex`**.
+
+### `40-plugins.kak` — plug.kak et les plugins
+
+Amorce `plug.kak` (clone automatique s'il manque), puis déclare tous les
+plugins. Ce qui était autrefois commenté d'un côté ou de l'autre (LSP, wiki,
+lean) est désormais **toujours installé, mais activé conditionnellement**.
+
+---
+
+## Aide-mémoire des raccourcis
+
+### Général
+
+| Touche | Mode | Action |
+|---|---|---|
+| `jj` | insertion | échap |
+| `<c-d>` | normal | curseur sur l'occurrence suivante du mot |
+| `<space>p` / `<space>P` | normal | coller depuis le presse-papier système (après / avant) |
+| `<a-space>` | normal | entrer dans le mode **easymotion** |
+| `<space>f` | normal | ouvrir **filetree** |
+
+### Buffers (kakoune-buffers)
+
+Le plugin déplace les mappings natifs pour libérer `b` et `B` :
+
+| Touche | Action | Remplace |
+|---|---|---|
+| `b` | mode buffers | ~~mot précédent~~ |
+| `B` | mode buffers verrouillé | ~~mot précédent (WORD)~~ |
+| `q` / `Q` | mot précédent / WORD précédent | ~~enregistrer / rejouer une macro~~ |
+| `<a-q>` / `<a-Q>` | variantes `<a-b>` / `<a-B>` | — |
+| `^` / `<a-^>` | enregistrer / rejouer une macro | — |
+| `<space>b` | choisir un buffer | — |
+| `<space>v` | choisir un buffer (mode verrouillé) | — |
+
+### Easymotion (`<a-space>`, puis)
+
+| Touche | Cible | Sens |
+|---|---|---|
+| `w` / `q` | mot | → / ← |
+| `W` / `Q` | WORD | → / ← |
+| `f` / `<a-f>` | caractère | → / ← |
+| `j` / `k` | ligne | ↓ / ↑ |
+| `e` | mot | **↔** |
+| `l` | ligne | **↔** |
+| `c` | caractère | **↔** |
+
+Les trois dernières (`e`, `l`, `c`) sont les variantes bidirectionnelles
+ajoutées dans `config/40-plugins.kak` ; `q` / `Q` pour le retour en arrière
+suivent la même logique que la permutation de kakoune-buffers.
+
+### LaTeX
+
+| Touche | Action |
+|---|---|
+| `<a-i>e` / `<a-a>e` | sélectionner l'intérieur / l'ensemble d'un environnement |
+| `<c-w>` | `latex-build` (dans un buffer LaTeX uniquement) |
+
+### ctags — *si `ctags` est installé*
+
+| Touche | Action |
+|---|---|
+| `<a-=>` | `ctags-search` — aller à la définition |
+| `<space>t` | `ctags-generate` — regénérer les tags |
+
+---
+
+## Plugins
+
+| Plugin | Rôle | Activation |
+|---|---|---|
+| [`plug.kak`](https://github.com/andreyorst/plug.kak) | gestionnaire de plugins | toujours (`noload`) |
+| [`kakoune-lsp`](https://github.com/kakoune-lsp/kakoune-lsp) | LSP | **si `%opt{has_lsp}`**, sur `rust`, `python`, `haskell`, `c`, `cpp`, `go`, `ocaml`, `javascript`, `typescript`, `latex` |
+| [`shellcheck.kak`](https://github.com/whereswaldon/shellcheck.kak) | lint des scripts shell | toujours |
+| [`kakoune-easymotion-alex`](https://github.com/alexblanc1/kakoune-easymotion-alex) | saut visuel *(fork perso)* | toujours, faces et mappings personnalisés |
+| [`kakoune-text-objects`](https://github.com/Delapouite/kakoune-text-objects) | objets texte supplémentaires | toujours |
+| [`kakoune-auto-percent`](https://github.com/Delapouite/kakoune-auto-percent) | `%` implicite sur les commandes | toujours |
+| [`auto-pairs.kak`](https://github.com/alexherbo2/auto-pairs.kak) | paires automatiques | toujours (`enable-auto-pairs`) |
+| [`kakoune-filetree`](https://github.com/occivink/kakoune-filetree) | explorateur de fichiers | toujours, `-dirs-first -no-empty-dirs -consider-gitignore` |
+| [`kakoune-buffers`](https://github.com/Delapouite/kakoune-buffers) | mode de gestion des buffers | toujours |
+| [`kakoune-wiki`](https://github.com/TeddyDD/kakoune-wiki) | wiki personnel | **si `~/wiki` existe** |
+| [`lean.kak`](https://github.com/enricozb/lean.kak) | support du langage Lean | toujours |
+| [`catppuccin/kakoune`](https://github.com/catppuccin/kakoune) | thèmes | toujours — `catppuccin_latte` |
+
+Dans le buffer `*filetree*` : `<ret>` ouvre le fichier, les `<a-flèches>`
+naviguent entre frères, parent et enfants.
+
+**Ajouter un plugin** : une ligne `plug "…"` dans `config/40-plugins.kak`, puis
+`:plug-install` dans Kakoune.
+
+---
+
+## Thèmes
+
+```sh
+bin/change-theme.pl              # sélection interactive via fzf
+bin/change-theme.pl catppuccin   # filtre par nom
+```
+
+Le script cherche les thèmes dans `colors/` **et** dans
+`<prefix>/share/kak/colors` (préfixe déduit de `command -v kak`, pas codé en
+dur). Il réécrit ensuite la ligne `colorscheme` dans le premier fichier qui en
+contient une :
+
+```
+local.kak  →  config/40-plugins.kak  →  kakrc
+```
+
+Si aucun n'en contient, il ajoute la ligne à `local.kak` — donc en dehors du
+dépôt, sans toucher à la config partagée.
+
+---
 
 ## Dépendances optionnelles
+
+Aucune n'est requise : la config démarre sans, en désactivant simplement la
+fonctionnalité correspondante.
 
 | Outil | Sert à | macOS | Debian/Ubuntu |
 |---|---|---|---|
@@ -85,9 +284,81 @@ text-objects, auto-percent, shellcheck, catppuccin_latte.
 | `pdflatex` | `latex-build` | MacTeX | `apt install texlive` |
 | presse-papier | yank/paste système | intégré (`pbcopy`) | `apt install xsel` ou `wl-clipboard` |
 
+---
+
 ## Note macOS
 
-`<a-space>` (easymotion) suppose que la touche Option est envoyée comme Meta.
-Dans Terminal.app : Réglages → Profils → Clavier → « Use Option as Meta key ».
-Dans iTerm2 : Profiles → Keys → Left Option key → Esc+. À défaut, la variante
-`<c-space>` est prête dans `config/40-plugins.kak`, il suffit de la décommenter.
+`<a-space>` (easymotion) suppose que la touche **Option** est envoyée comme
+**Meta** :
+
+- **Terminal.app** — Réglages → Profils → Clavier → « Use Option as Meta key »
+- **iTerm2** — Profiles → Keys → Left Option key → `Esc+`
+
+À défaut, la variante `<c-space>` est déjà écrite dans
+`config/40-plugins.kak` : il suffit de la décommenter.
+
+---
+
+## Personnaliser sans casser le partage
+
+| Ce que tu veux faire | Où l'écrire |
+|---|---|
+| Un réglage valable partout | `config/<NN>-….kak` |
+| Un réglage propre à macOS ou Linux | `config/local/darwin.kak` / `linux.kak` |
+| Un réglage propre à **cette** machine | `local.kak` *(gitignoré)* |
+| Ajouter un plugin | `config/40-plugins.kak`, puis `:plug-install` |
+| Un nouveau module | `config/50-….kak` — sourcé automatiquement |
+
+Ce qui est **volontairement gitignoré** :
+
+```
+plugins/                      reconstruit par :plug-install
+autoload/standard-library     symlink recréé par install.sh
+colors/kakoune                symlink créé par le hook de build catppuccin
+local.kak                     surcharges par machine
+*.swp  .DS_Store
+```
+
+---
+
+## Historique : ce qui bloquait le partage
+
+<details>
+<summary>Les sept points corrigés lors de la fusion des deux dépôts</summary>
+
+<br>
+
+| Problème | Ancien état | Résolution |
+|---|---|---|
+| `autoload/standard-library` | symlink en dur vers `/opt/homebrew/Cellar/kakoune/2026.05.21/share/kak/rc` (Mac) — cassé sur le ThinkPad, et re-cassé à chaque mise à jour de Kakoune | gitignoré, recréé par `install.sh` à partir du binaire `kak` résolu |
+| `change-theme.pl` | shebang `/home/linuxbrew/.linuxbrew/bin/env` d'un côté, chemin de thèmes `/opt/homebrew/share/kak/colors` de l'autre | shebang `/usr/bin/env perl`, préfixe déduit de `command -v kak` |
+| Presse-papier | `xsel` en dur + kakboard (doublon) sur le ThinkPad ; **rien** sur le Mac | détection à l'exécution : `pbcopy` → `wl-copy` → `xsel` → `xclip` |
+| `plugins/` versionné | des milliers de fichiers vendorisés, plus des `.build/*/hooks` contenant `/Users/blancalexandre/…` et `/home/alex/…` | gitignoré, reconstruit par `:plug-install` |
+| `colors/kakoune` | symlink absolu créé par le hook de build catppuccin | gitignoré |
+| LSP / wiki / lean | actifs sur le ThinkPad, **commentés** sur le Mac | toujours installés ; LSP activé si le binaire existe, wiki activé si `~/wiki` existe |
+| `<c-w>` | un hook `RawKey` **global** lançait `pdflatex` sur n'importe quel buffer ouvert | commande `latex-build`, mappée seulement sur `filetype=latex`, et qui remonte les erreurs |
+
+### Fusion des réglages
+
+**Repris du ThinkPad** — `wrap -word -indent`, `<c-d>` multi-curseur, mappings
+ctags (`<a-=>`, `<space>t`), objet texte `e` pour LaTeX, kakoune-buffers avec la
+permutation `^`/`q`, kakoune-lsp, kakoune-wiki, lean.kak.
+
+**Repris du Mac** — la config de kakoune-filetree (`<space>f`, arbre dans la
+fenêtre courante, `toolsclient`/`jumpclient` volontairement vides),
+auto-pairs.kak.
+
+**Commun aux deux, conservé tel quel** — `number-lines -relative`,
+`show-whitespaces`, `indentwidth 4`, `ncurses_assistant=dilbert`, `modelinefmt`,
+`jj` → échap, easymotion (faces et mappings bidirectionnels), text-objects,
+auto-percent, shellcheck, `catppuccin_latte`.
+
+### Changements de comportement assumés
+
+1. **`<c-w>`** ne compile plus que dans les buffers LaTeX.
+2. **kakboard n'est plus chargé** — doublon avec le hook `RegisterModified`, et
+   limité à X11. La ligne pour le remettre est dans `config/local/linux.kak`.
+3. **`<space>p` / `<space>P`** collent depuis le presse-papier système. Rien
+   n'existait pour ça auparavant ; `p` / `P` natifs restent intacts.
+
+</details>

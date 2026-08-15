@@ -1,0 +1,18 @@
+# Plugins : gérés par plug.kak, jamais versionnés.
+# (Les deux anciens dépôts les committaient, d'où des milliers de fichiers
+#  vendorisés et des .build/ contenant des chemins absolus par machine.)
+plugins/
+
+# Symlink vers la bibliothèque standard, recréé par install.sh
+autoload/standard-library
+
+# Symlink créé par le hook de build de catppuccin/kakoune
+colors/kakoune
+
+# Surcharges propres à une machine
+local.kak
+
+# Divers
+*.swp
+.DS_Store
+.claude/
