@@ -16,14 +16,31 @@ plug "andreyorst/plug.kak" noload
 
 # --- LSP ---------------------------------------------------------------------
 # Le plugin est toujours installé ; l'activation dépend de la présence du binaire
-# (brew install kakoune-lsp, ou cargo install kakoune-lsp).
+# (brew install kakoune-lsp, ou cargo install kakoune-lsp). Les serveurs de
+# langage s'installent séparément — rust-analyzer vit dans ~/.local/bin.
 plug "https://github.com/kakoune-lsp/kakoune-lsp.git" config %{
-    hook global WinSetOption filetype=(rust|python|haskell|c|cpp|go|ocaml|javascript|typescript|latex) %{
-        evaluate-commands %sh{
-            [ "$kak_opt_has_lsp" = true ] && printf 'try %%{ lsp-enable-window }\n'
-            exit 0
-        }
+    # Le binaire est fourni par Homebrew sous son ancien nom, kak-lsp, qui est
+    # justement la valeur par défaut de l'option lsp_cmd : rien à câbler.
+    #
+    # lsp-enable est global et tourne au démarrage, là où l'ancien
+    # lsp-enable-window attendait l'ouverture d'un buffer d'un filetype listé.
+    # Il ne lance aucun serveur par lui-même : il se contente de poser les
+    # hooks. Un serveur ne démarre que si le filetype du buffer en déclare un
+    # (rc/servers.kak du plugin) et que ses root_globs sont présents —
+    # rust-analyzer réclame un Cargo.toml. Rien ne tourne donc en dehors des
+    # projets concernés, et la liste de filetypes à tenir à jour disparaît.
+    #
+    # rust-analyzer : rc/servers.kak fournit déjà root_globs, la vérification
+    # via clippy et les libellés de symboles. Le binaire est simplement cherché
+    # dans le PATH — ici ~/.local/bin/rust-analyzer, installé à la main.
+    evaluate-commands %sh{
+        [ "$kak_opt_has_lsp" = true ] && printf 'lsp-enable\n'
+        exit 0
     }
+
+    # Le plugin remplit tout le mode lsp (d définition, r références, h survol,
+    # e diagnostics, R renommer…), mais ne lui donne aucun point d'entrée.
+    map global user l ': enter-user-mode lsp<ret>' -docstring 'lsp'
 }
 
 # --- Outils ------------------------------------------------------------------

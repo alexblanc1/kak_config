@@ -182,6 +182,7 @@ lean) est désormais **toujours installé, mais activé conditionnellement**.
 | `<space>p` / `<space>P` | normal | coller depuis le presse-papier système (après / avant) |
 | `<a-space>` | normal | entrer dans le mode **easymotion** |
 | `<space>f` | normal | ouvrir **filetree** |
+| `<space>l` | normal | entrer dans le mode **LSP** |
 
 ### Buffers (kakoune-buffers)
 
@@ -234,6 +235,27 @@ le retour en arrière : c'est un mode à part, non concerné par la permutation
 | `<a-i>e` / `<a-a>e` | sélectionner l'intérieur / l'ensemble d'un environnement |
 | `<c-w>` | `latex-build` (dans un buffer LaTeX uniquement) |
 
+### LSP (`<space>l`, puis) — *si `kak-lsp` est installé*
+
+`lsp-enable` est appelé au démarrage de Kakoune, mais aucun serveur de langage
+n'est lancé tant qu'un buffer ne le réclame pas : il faut à la fois un filetype
+reconnu et la racine de projet correspondante (`Cargo.toml` pour Rust).
+
+| Touche | Action |
+|---|---|
+| `d` | aller à la définition |
+| `y` | aller à la définition du type |
+| `r` | lister les références |
+| `h` | afficher la documentation au curseur |
+| `e` | lister erreurs et avertissements du projet |
+| `n` / `p` | erreur suivante / précédente |
+| `a` | actions de code |
+| `f` | formater le buffer |
+| `R` | renommer le symbole |
+| `s` | aller à un symbole du document |
+
+Le mode en contient davantage : ils s'affichent dans l'infobox à l'entrée du mode.
+
 ### ctags — *si `ctags` est installé*
 
 | Touche | Action |
@@ -248,7 +270,7 @@ le retour en arrière : c'est un mode à part, non concerné par la permutation
 | Plugin | Rôle | Activation |
 |---|---|---|
 | [`plug.kak`](https://github.com/andreyorst/plug.kak) | gestionnaire de plugins | toujours (`noload`) |
-| [`kakoune-lsp`](https://github.com/kakoune-lsp/kakoune-lsp) | LSP | **si `%opt{has_lsp}`**, sur `rust`, `python`, `haskell`, `c`, `cpp`, `go`, `ocaml`, `javascript`, `typescript`, `latex` |
+| [`kakoune-lsp`](https://github.com/kakoune-lsp/kakoune-lsp) | LSP | **si `%opt{has_lsp}`**, globalement au démarrage (`lsp-enable`) ; les serveurs eux-mêmes ne démarrent qu'au besoin |
 | [`shellcheck.kak`](https://github.com/whereswaldon/shellcheck.kak) | lint des scripts shell | toujours |
 | [`kakoune-easymotion-alex`](https://github.com/alexblanc1/kakoune-easymotion-alex) | saut visuel *(fork perso)* | toujours, faces et mappings personnalisés |
 | [`kakoune-text-objects`](https://github.com/Delapouite/kakoune-text-objects) | objets texte supplémentaires | toujours |
@@ -297,6 +319,7 @@ fonctionnalité correspondante.
 | Outil | Sert à | macOS | Debian/Ubuntu |
 |---|---|---|---|
 | `kakoune-lsp` | LSP | `brew install kakoune-lsp` | `cargo install kakoune-lsp` |
+| `rust-analyzer` | LSP Rust | release GitHub dans `~/.local/bin`, ou `rustup component add rust-analyzer` | idem |
 | `ctags` | `<a-=>`, `<space>t` | `brew install universal-ctags` | `apt install universal-ctags` |
 | `fzf` | `change-theme.pl` | `brew install fzf` | `apt install fzf` |
 | `pdflatex` | `latex-build` | MacTeX | `apt install texlive` |
