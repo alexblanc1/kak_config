@@ -67,10 +67,18 @@ plug 'delapouite/kakoune-buffers' config %{
     # Donc ^ = rejouer, <a-^> = enregistrer.
     map global normal ^     q
     map global normal <a-^> Q
-    map global normal q     b
-    map global normal Q     B
-    map global normal <a-q> <a-b>
-    map global normal <a-Q> <a-B>
+    map global normal z     b
+    map global normal Z     B
+    map global normal <a-z> <a-b>
+    map global normal <a-Z> <a-B>
+
+    # z et q permutés : q récupère la sauvegarde/restauration de sélections.
+    # Les mappings de Kakoune ne sont pas récursifs, donc q exécute bien le z
+    # natif et non le z remappé ci-dessus.
+    map global normal q     z
+    map global normal Q     Z
+    map global normal <a-q> <a-z>
+    map global normal <a-Q> <a-Z>
 
     # ^ est une touche morte en AZERTY : seule, elle n'envoie rien au terminal
     # (il faut ^ puis Espace), et <a-^> est en pratique inatteignable — donc

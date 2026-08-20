@@ -191,8 +191,10 @@ Le plugin déplace les mappings natifs pour libérer `b` et `B` :
 |---|---|---|
 | `b` | mode buffers | ~~mot précédent~~ |
 | `B` | mode buffers verrouillé | ~~mot précédent (WORD)~~ |
-| `q` / `Q` | mot précédent / WORD précédent | ~~rejouer / enregistrer une macro~~ |
-| `<a-q>` / `<a-Q>` | variantes `<a-b>` / `<a-B>` | — |
+| `z` / `Z` | mot précédent / WORD précédent | ~~restaurer / sauvegarder les sélections~~ |
+| `<a-z>` / `<a-Z>` | variantes `<a-b>` / `<a-B>` | ~~combiner les sélections~~ |
+| `q` / `Q` | restaurer / sauvegarder les sélections | ~~rejouer / enregistrer une macro~~ |
+| `<a-q>` / `<a-Q>` | combiner les sélections | — |
 | `^` / `<a-^>` | rejouer / enregistrer une macro | — |
 | `<c-p>` / `<c-q>` | rejouer / enregistrer une macro (doublons AZERTY) | — |
 | `<space>b` | choisir un buffer | — |
@@ -221,8 +223,9 @@ l'enregistrement s'interrompt dès que le mode se dépile et la macro reste vide
 | `c` | caractère | **↔** |
 
 Les trois dernières (`e`, `l`, `c`) sont les variantes bidirectionnelles
-ajoutées dans `config/40-plugins.kak` ; `q` / `Q` pour le retour en arrière
-suivent la même logique que la permutation de kakoune-buffers.
+ajoutées dans `config/40-plugins.kak`. Le mode easymotion garde `q` / `Q` pour
+le retour en arrière : c'est un mode à part, non concerné par la permutation
+`z` / `q` du mode normal.
 
 ### LaTeX
 
