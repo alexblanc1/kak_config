@@ -239,7 +239,21 @@ le retour en arrière : c'est un mode à part, non concerné par la permutation
 
 `lsp-enable` est appelé au démarrage de Kakoune, mais aucun serveur de langage
 n'est lancé tant qu'un buffer ne le réclame pas : il faut à la fois un filetype
-reconnu et la racine de projet correspondante (`Cargo.toml` pour Rust).
+reconnu et la racine de projet correspondante.
+
+| Langage | Serveur | Racine attendue |
+|---|---|---|
+| Rust | `rust-analyzer` | `Cargo.toml` |
+| Python | `pylsp` | `pyproject.toml`, `setup.py`, `poetry.lock` ou `.git` |
+| LaTeX | `texlab` | `.git` |
+
+Les réglages viennent de `rc/servers.kak` du plugin, pas de ce dépôt : il n'y a
+donc rien à maintenir ici tant que les défauts conviennent. Seul le visualiseur
+PDF de texlab est surchargé, côté macOS (voir plus bas).
+
+> **texlab ne remonte pas de diagnostics à la volée.** Il ne les produit qu'à
+> partir d'une compilation, non activée ici pour ne pas doubler `<c-w>`
+> (`latex-build`). Complétion, survol et navigation fonctionnent normalement.
 
 | Touche | Action |
 |---|---|
@@ -320,6 +334,9 @@ fonctionnalité correspondante.
 |---|---|---|---|
 | `kakoune-lsp` | LSP | `brew install kakoune-lsp` | `cargo install kakoune-lsp` |
 | `rust-analyzer` | LSP Rust | release GitHub dans `~/.local/bin`, ou `rustup component add rust-analyzer` | idem |
+| `texlab` | LSP LaTeX | `brew install texlab` | `apt install texlab`, ou `cargo install --locked texlab` |
+| `pylsp` | LSP Python | `pipx install "python-lsp-server[pyflakes,rope]"` | idem |
+| `Skim` | recherche avant LaTeX (macOS) | `brew install --cask skim` | — (zathura, déjà le défaut) |
 | `ctags` | `<a-=>`, `<space>t` | `brew install universal-ctags` | `apt install universal-ctags` |
 | `fzf` | `change-theme.pl` | `brew install fzf` | `apt install fzf` |
 | `pdflatex` | `latex-build` | MacTeX | `apt install texlive` |
@@ -337,6 +354,13 @@ fonctionnalité correspondante.
 
 À défaut, la variante `<c-space>` est déjà écrite dans
 `config/40-plugins.kak` : il suffit de la décommenter.
+
+**LaTeX.** kakoune-lsp câble la recherche avant de texlab (sauter du source au
+bon endroit du PDF) sur **zathura**, qui convient au ThinkPad mais n'existe pas
+sur macOS. `config/local/darwin.kak` la rebascule sur **Skim**, seul visualiseur
+Mac courant à gérer SyncTeX — mais seulement s'il est installé
+(`brew install --cask skim`). Sans lui, le défaut zathura reste en place : il ne
+sert à rien sur Mac, sans pour autant gêner le reste de texlab.
 
 ---
 
