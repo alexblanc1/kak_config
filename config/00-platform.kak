@@ -8,6 +8,10 @@ declare-option -docstring "système hôte, en minuscules : darwin, linux, …" s
 declare-option -docstring "chemin d'installation de Kakoune (préfixe)"    str kak_prefix
 declare-option -docstring "true si un binaire kakoune-lsp est disponible" bool has_lsp    false
 declare-option -docstring "true si ctags est disponible"                  bool has_ctags  false
+declare-option -docstring "true si un wiki existe sur la machine"         bool has_wiki   false
+declare-option -docstring "racine du wiki, si has_wiki"                   str  wiki_dir
+declare-option -docstring "true si le binaire rustowl est disponible"     bool has_rustowl false
+declare-option -docstring "chemin du binaire rustowl, si has_rustowl"     str  rustowl_bin
 
 evaluate-commands %sh{
     printf 'set-option global os %%{%s}\n' "$(uname | tr '[:upper:]' '[:lower:]')"
@@ -34,6 +38,23 @@ evaluate-commands %sh{
 
     if command -v ctags >/dev/null 2>&1; then
         printf 'set-option global has_ctags true\n'
+    fi
+
+    # rustowl ne s'installe pas par un gestionnaire de paquets : son script
+    # officiel le pose dans ~/.rustowl. On accepte les deux emplacements.
+    for candidate in "$HOME/.rustowl/rustowl" "$(command -v rustowl 2>/dev/null)"; do
+        if [ -n "$candidate" ] && [ -x "$candidate" ]; then
+            printf 'set-option global has_rustowl true\n'
+            printf 'set-option global rustowl_bin %%{%s}\n' "$candidate"
+            break
+        fi
+    done
+
+    # Testé ici plutôt que dans 40-plugins.kak : ce %sh{} tourne de toute façon,
+    # une vérification de plus y est gratuite, alors qu'elle y coûterait un fork.
+    if [ -d "$HOME/wiki" ]; then
+        printf 'set-option global has_wiki true\n'
+        printf 'set-option global wiki_dir %%{%s/wiki}\n' "$HOME"
     fi
 
     exit 0

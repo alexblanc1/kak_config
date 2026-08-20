@@ -3,22 +3,27 @@
 # Union des deux dépôts. Ce qui était commenté côté Mac (lsp, wiki, lean) est
 # ici chargé mais activé conditionnellement, donc plus besoin de commenter
 # et décommenter des lignes à chaque changement de machine.
-
-evaluate-commands %sh{
-    plugins="$kak_config/plugins"
-    mkdir -p "$plugins"
-    [ ! -e "$plugins/plug.kak" ] && \
-        git clone -q https://github.com/andreyorst/plug.kak.git "$plugins/plug.kak"
-    printf "source '%s/plug.kak/rc/plug.kak'\n" "$plugins"
-}
-
-plug "andreyorst/plug.kak" noload
+#
+# Le chargement passe par config/05-plugin.kak, et non plus par plug.kak : voir
+# l'en-tête de ce fichier-là pour le pourquoi, et pour la raison très concrète
+# qui impose des `source` en clair ici plutôt qu'une jolie commande maison.
+#
+# Chaque plugin est déclaré par `plugin` (métadonnée pour :plugin-install), puis
+# ses fichiers sont sourcés dans un `try`. Un dépôt pas encore cloné laisse donc
+# un message dans *debug* au lieu d'interrompre le reste de la config — ce qui
+# arrive à chaque fois qu'on installe la config sur une nouvelle machine.
+#
+# Installer ce qui manque : :plugin-install — mettre à jour : :plugin-update
 
 # --- LSP ---------------------------------------------------------------------
 # Le plugin est toujours installé ; l'activation dépend de la présence du binaire
 # (brew install kakoune-lsp, ou cargo install kakoune-lsp). Les serveurs de
 # langage s'installent séparément — rust-analyzer vit dans ~/.local/bin.
-plug "https://github.com/kakoune-lsp/kakoune-lsp.git" config %{
+plugin kakoune-lsp https://github.com/kakoune-lsp/kakoune-lsp.git
+try %{
+    source "%opt{plugin_dir}/kakoune-lsp/rc/lsp.kak"
+    source "%opt{plugin_dir}/kakoune-lsp/rc/servers.kak"
+
     # Le binaire est fourni par Homebrew sous son ancien nom, kak-lsp, qui est
     # justement la valeur par défaut de l'option lsp_cmd : rien à câbler.
     #
@@ -33,21 +38,24 @@ plug "https://github.com/kakoune-lsp/kakoune-lsp.git" config %{
     # rust-analyzer : rc/servers.kak fournit déjà root_globs, la vérification
     # via clippy et les libellés de symboles. Le binaire est simplement cherché
     # dans le PATH — ici ~/.local/bin/rust-analyzer, installé à la main.
-    evaluate-commands %sh{
-        [ "$kak_opt_has_lsp" = true ] && printf 'lsp-enable\n'
-        exit 0
-    }
+    evaluate-commands "do-if-%opt{has_lsp} lsp-enable"
+} catch %{ echo -debug "plugin kakoune-lsp : %val{error}" }
 
-    # Le plugin remplit tout le mode lsp (d définition, r références, h survol,
-    # e diagnostics, R renommer…), mais ne lui donne aucun point d'entrée.
-    map global user l ': enter-user-mode lsp<ret>' -docstring 'lsp'
-}
+# Le plugin remplit tout le mode lsp (d définition, r références, h survol,
+# e diagnostics, R renommer…), mais ne lui donne aucun point d'entrée.
+map global user l ': enter-user-mode lsp<ret>' -docstring 'lsp'
 
 # --- Outils ------------------------------------------------------------------
-plug "https://github.com/whereswaldon/shellcheck.kak.git"
+plugin shellcheck.kak https://github.com/whereswaldon/shellcheck.kak.git
+try %{
+    source "%opt{plugin_dir}/shellcheck.kak/shellcheck.kak"
+} catch %{ echo -debug "plugin shellcheck.kak : %val{error}" }
 
 # --- Déplacement -------------------------------------------------------------
-plug "https://github.com/alexblanc1/kakoune-easymotion-alex.git" config %{
+plugin kakoune-easymotion-alex https://github.com/alexblanc1/kakoune-easymotion-alex.git
+try %{
+    source "%opt{plugin_dir}/kakoune-easymotion-alex/easymotion.kak"
+
     face global EasyMotionBackground rgb:000001
     face global EasyMotionForeground rgb:ee3a8c,rgb:000000+fg
     face global EasyMotionSelected   yellow+b
@@ -56,7 +64,7 @@ plug "https://github.com/alexblanc1/kakoune-easymotion-alex.git" config %{
     map global easymotion e ': easy-motion-word<ret>' -docstring 'word ↔'
     map global easymotion l ': easy-motion-line<ret>' -docstring 'line ↔'
     map global easymotion c ': easy-motion-char<ret>' -docstring 'char ↔'
-}
+} catch %{ echo -debug "plugin kakoune-easymotion-alex : %val{error}" }
 
 # Attention macOS : dans Terminal.app il faut cocher « Use Option as Meta key »
 # pour que <a-space> soit reçu. Sinon, décommenter la variante <c-space>
@@ -65,64 +73,114 @@ map global normal <a-space> ': enter-user-mode easymotion<ret>'
 # map global normal <c-space> ': execute-keys gtGb<ret>: enter-user-mode easymotion<ret>'
 
 # --- Édition -----------------------------------------------------------------
-plug "https://github.com/Delapouite/kakoune-text-objects.git"
-plug "https://github.com/Delapouite/kakoune-auto-percent.git"
+plugin kakoune-text-objects https://github.com/Delapouite/kakoune-text-objects.git
+try %{
+    source "%opt{plugin_dir}/kakoune-text-objects/text-objects.kak"
+} catch %{ echo -debug "plugin kakoune-text-objects : %val{error}" }
 
-plug "https://github.com/alexherbo2/auto-pairs.kak.git" config %{
+plugin kakoune-auto-percent https://github.com/Delapouite/kakoune-auto-percent.git
+try %{
+    source "%opt{plugin_dir}/kakoune-auto-percent/auto-percent.kak"
+} catch %{ echo -debug "plugin kakoune-auto-percent : %val{error}" }
+
+plugin auto-pairs.kak https://github.com/alexherbo2/auto-pairs.kak.git
+try %{
+    source "%opt{plugin_dir}/auto-pairs.kak/rc/auto-pairs.kak"
     enable-auto-pairs
-}
+} catch %{ echo -debug "plugin auto-pairs.kak : %val{error}" }
 
 # --- Navigation --------------------------------------------------------------
-plug "https://github.com/occivink/kakoune-filetree.git" config %{
+plugin kakoune-filetree https://github.com/occivink/kakoune-filetree.git
+try %{
+    source "%opt{plugin_dir}/kakoune-filetree/filetree.kak"
+
     # Arbre dans un simple buffer de la fenêtre courante : ni tmux ni client externe.
     map global user f ': filetree-switch-or-start -dirs-first -no-empty-dirs -consider-gitignore<ret>' -docstring 'filetree'
     # Dans le buffer *filetree* : <ret> ouvre, <a-flèches> naviguent entre frères/parent/enfant
-}
+} catch %{ echo -debug "plugin kakoune-filetree : %val{error}" }
 
-plug 'delapouite/kakoune-buffers' config %{
-    # Rappel : dans Kakoune (à l'inverse de Vim) Q enregistre et q rejoue.
-    # Donc ^ = rejouer, <a-^> = enregistrer.
-    map global normal ^     q
-    map global normal <a-^> Q
-    map global normal z     b
-    map global normal Z     B
-    map global normal <a-z> <a-b>
-    map global normal <a-Z> <a-B>
+plugin kakoune-buffers https://github.com/Delapouite/kakoune-buffers.git
+try %{
+    source "%opt{plugin_dir}/kakoune-buffers/buffers.kak"
+} catch %{ echo -debug "plugin kakoune-buffers : %val{error}" }
 
-    # z et q permutés : q récupère la sauvegarde/restauration de sélections.
-    # Les mappings de Kakoune ne sont pas récursifs, donc q exécute bien le z
-    # natif et non le z remappé ci-dessus.
-    map global normal q     z
-    map global normal Q     Z
-    map global normal <a-q> <a-z>
-    map global normal <a-Q> <a-Z>
+# Rappel : dans Kakoune (à l'inverse de Vim) Q enregistre et q rejoue.
+# Donc ^ = rejouer, <a-^> = enregistrer.
+map global normal ^     q
+map global normal <a-^> Q
+map global normal z     b
+map global normal Z     B
+map global normal <a-z> <a-b>
+map global normal <a-Z> <a-B>
 
-    # ^ est une touche morte en AZERTY : seule, elle n'envoie rien au terminal
-    # (il faut ^ puis Espace), et <a-^> est en pratique inatteignable — donc
-    # impossible d'enregistrer une macro. Doublons directement tapables.
-    # Obligatoirement en mode normal : depuis le mode user, l'enregistrement
-    # s'arrête dès que le mode se dépile, la macro reste vide.
-    map global normal <c-q> Q -docstring 'enregistrer / arrêter une macro'
-    map global normal <c-p> q -docstring 'rejouer la macro'
-    map global normal b ': enter-buffers-mode<ret>'            -docstring 'buffers'
-    map global normal B ': enter-user-mode -lock buffers<ret>' -docstring 'buffers (lock)'
-    map global user   b ': enter-user-mode buffers<ret>'       -docstring 'choisir un buffer'
-    map global user   v ': enter-user-mode -lock buffers<ret>' -docstring 'choisir un buffer (lock)'
-}
+# z et q permutés : q récupère la sauvegarde/restauration de sélections.
+# Les mappings de Kakoune ne sont pas récursifs, donc q exécute bien le z
+# natif et non le z remappé ci-dessus.
+map global normal q     z
+map global normal Q     Z
+map global normal <a-q> <a-z>
+map global normal <a-Q> <a-Z>
+
+# ^ est une touche morte en AZERTY : seule, elle n'envoie rien au terminal
+# (il faut ^ puis Espace), et <a-^> est en pratique inatteignable — donc
+# impossible d'enregistrer une macro. Doublons directement tapables.
+# Obligatoirement en mode normal : depuis le mode user, l'enregistrement
+# s'arrête dès que le mode se dépile, la macro reste vide.
+map global normal <c-q> Q -docstring 'enregistrer / arrêter une macro'
+map global normal <c-p> q -docstring 'rejouer la macro'
+map global normal b ': enter-buffers-mode<ret>'            -docstring 'buffers'
+map global normal B ': enter-user-mode -lock buffers<ret>' -docstring 'buffers (lock)'
+map global user   b ': enter-user-mode buffers<ret>'       -docstring 'choisir un buffer'
+map global user   v ': enter-user-mode -lock buffers<ret>' -docstring 'choisir un buffer (lock)'
 
 # --- Wiki --------------------------------------------------------------------
-# Activé seulement si ~/wiki existe sur la machine.
-plug "https://github.com/TeddyDD/kakoune-wiki.git" config %{
-    evaluate-commands %sh{
-        [ -d "$HOME/wiki" ] && printf 'wiki-setup %%{%s/wiki}\n' "$HOME"
-        exit 0
-    }
+# Activé seulement si ~/wiki existe sur la machine (has_wiki, cf. 00-platform).
+plugin kakoune-wiki https://github.com/TeddyDD/kakoune-wiki.git
+try %{
+    source "%opt{plugin_dir}/kakoune-wiki/rc/wiki.kak"
+    evaluate-commands "do-if-%opt{has_wiki} wiki-setup %opt{wiki_dir}"
+} catch %{ echo -debug "plugin kakoune-wiki : %val{error}" }
+
+# --- Rust : ownership et durées de vie ---------------------------------------
+# RustOwl souligne, sous le curseur, la durée de vie de la variable, ses
+# emprunts et ses déplacements — vert la durée de vie, bleu l'emprunt immuable,
+# violet l'emprunt mutable, orange un déplacement ou un appel, rouge une erreur
+# de durée de vie.
+#
+# Son analyse passe par une méthode LSP non standard (rustowl/cursor) que le
+# binaire kakoune-lsp ne sait pas router : d'où un plugin autonome, avec son
+# propre démon, plutôt qu'un second serveur déclaré dans lsp_config.
+#
+# Le binaire s'installe à part (script officiel du dépôt, il atterrit dans
+# ~/.rustowl) ; sans lui, has_rustowl reste false et rien n'est câblé.
+define-command -hidden rustowl-map-toggle %{
+    map global user r ': rustowl-toggle<ret>' -docstring 'rustowl (ownership)'
 }
+
+plugin kak-rustowl https://github.com/alexblanc1/kak-rustowl.git
+try %{
+    source "%opt{plugin_dir}/kak-rustowl/rc/rustowl.kak"
+
+    set-option global rustowl_cmd %opt{rustowl_bin}
+
+    # Pas d'activation automatique : la toute première analyse d'un projet
+    # passe par cargo et prend plusieurs secondes. On l'active à la demande,
+    # fenêtre par fenêtre ; ensuite les requêtes reviennent en ~0,2 s.
+    evaluate-commands "do-if-%opt{has_rustowl} rustowl-map-toggle"
+} catch %{ echo -debug "plugin kak-rustowl : %val{error}" }
 
 # --- Langages ----------------------------------------------------------------
-plug "https://github.com/enricozb/lean.kak.git"
+plugin lean.kak https://github.com/enricozb/lean.kak.git
+try %{
+    source "%opt{plugin_dir}/lean.kak/rc/syntax.kak"
+    source "%opt{plugin_dir}/lean.kak/rc/lsp.kak"
+    source "%opt{plugin_dir}/lean.kak/kakoune/src/kakscripts/init-kakoune-rs-logging.kak"
+} catch %{ echo -debug "plugin lean.kak : %val{error}" }
 
 # --- Thème -------------------------------------------------------------------
-plug "catppuccin/kakoune" theme config %{
+# Aucun source : rien à charger au démarrage. :plugin-install repère le colors/
+# du dépôt et le relie dans config/colors, où colorscheme va le chercher.
+plugin kakoune https://github.com/catppuccin/kakoune.git
+try %{
     colorscheme catppuccin_latte
-}
+} catch %{ echo -debug "thème catppuccin : %val{error}" }

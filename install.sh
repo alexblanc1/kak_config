@@ -61,14 +61,12 @@ else
     warn "$RUNTIME/rc introuvable — la bibliothèque standard ne sera pas chargée"
 fi
 
-# --- 4. Amorcer plug.kak -----------------------------------------------------
+# --- 4. Préparer les répertoires de plugins ----------------------------------
+# Plus de gestionnaire à amorcer : les plugins sont chargés par
+# config/05-plugin.kak, qui n'a besoin que de ces deux répertoires. Le clonage
+# se fait depuis Kakoune avec :plugin-install.
 mkdir -p "$REPO/plugins" "$REPO/colors"
-if [ ! -e "$REPO/plugins/plug.kak" ]; then
-    git clone -q https://github.com/andreyorst/plug.kak.git "$REPO/plugins/plug.kak"
-    info "plug.kak cloné"
-else
-    info "plug.kak déjà présent"
-fi
+info "plugins/ et colors/ prêts"
 
 chmod +x "$REPO/bin/change-theme.pl" 2>/dev/null || true
 
@@ -117,6 +115,13 @@ fi
 rust-analyzer --version >/dev/null 2>&1 \
     || warn "rust-analyzer absent ou inutilisable : $HINT_RA"
 command -v texlab >/dev/null 2>&1 || warn "texlab absent : LaTeX sans LSP ($HINT_TEXLAB)"
+
+# rustowl n'est dans aucun gestionnaire de paquets : son script officiel le pose
+# dans ~/.rustowl. Sans lui, <space>r n'est même pas câblé.
+if [ ! -x "$HOME/.rustowl/rustowl" ] && ! command -v rustowl >/dev/null 2>&1; then
+    warn "rustowl absent : pas de visualisation d'ownership Rust"
+    warn "  curl -fsSL https://raw.githubusercontent.com/cordx56/rustowl/main/install.sh | sh"
+fi
 command -v pylsp  >/dev/null 2>&1 || warn "pylsp absent : Python sans LSP ($HINT_PYLSP)"
 
-info "terminé — lance kak puis : :plug-install"
+info "terminé — lance kak puis : :plugin-install"

@@ -9,10 +9,11 @@
 # Ce fichier ne contient AUCUN réglage : il ne fait qu'ordonner les modules.
 #
 #   config/00-platform.kak   détection OS / outils disponibles
+#   config/05-plugin.kak     chargeur de plugins (remplace plug.kak au démarrage)
 #   config/10-options.kak    options globales, affichage
 #   config/20-clipboard.kak  presse-papier système (pbcopy / wl-copy / xsel / xclip)
 #   config/30-mappings.kak   raccourcis et hooks indépendants des plugins
-#   config/40-plugins.kak    plug.kak + tous les plugins et leurs raccourcis
+#   config/40-plugins.kak    tous les plugins et leurs raccourcis
 #   config/local/<os>.kak    surcharges spécifiques à un OS (versionnées)
 #   local.kak                surcharges spécifiques à CETTE machine (non versionné)
 
