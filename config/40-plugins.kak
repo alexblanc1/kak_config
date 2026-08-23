@@ -58,13 +58,23 @@ try %{
     # buffer lsp_servers` déclenche lsp-did-change-config, donc laisser les deux
     # s'exécuter fait démarrer deux marksman — celui de la config d'origine, sur
     # une racine que le serveur refuse, puis le nôtre.
+    #
+    # command pointe sur un shim et non sur marksman directement : le serveur
+    # renvoie des URI non encodées dès qu'un nom de note porte un accent, ce qui
+    # fait paniquer kakoune-lsp au lieu de suivre le lien. Voir l'en-tête de
+    # bin/marksman-uri-fix ; retirer cette ligne suffit à revenir au serveur nu.
+    #
+    # Le bloc est en guillemets et non en %{} : seules les chaînes en guillemets
+    # développent %val{config}, %{} est littéral. D'où aussi les apostrophes
+    # côté TOML — des guillemets imbriqués demanderaient à être doublés.
     remove-hooks global lsp-filetype-markdown
     hook -group lsp-filetype-markdown global BufSetOption filetype=markdown %{
-        set-option buffer lsp_servers %{
+        set-option buffer lsp_servers "
             [marksman]
-            root_globs = [".marksman.toml", ".git", ".hg"]
-            args = ["server"]
-        }
+            root_globs = ['.marksman.toml', '.git', '.hg']
+            command = '%val{config}/bin/marksman-uri-fix'
+            args = ['server']
+        "
     }
 } catch %{ echo -debug "plugin kakoune-lsp : %val{error}" }
 
@@ -210,4 +220,12 @@ try %{
 plugin kakoune https://github.com/catppuccin/kakoune.git
 try %{
     colorscheme catppuccin_latte
+
+    # Deux surcharges, après le colorscheme puisqu'il écrase tout ce qui précède.
+    # catppuccin rend title en couleur de texte simplement graissée, et header —
+    # celui que markdown.kak applique à tous les titres « # … » — dans un gris
+    # plus clair que la prose : les titres reculent au lieu de ressortir. Les
+    # deux teintes viennent de la palette du thème, rien d'autre ne bouge.
+    face global header rgb:fe640b+b    # peach
+    face global title  rgb:e64553+b    # maroon
 } catch %{ echo -debug "thème catppuccin : %val{error}" }

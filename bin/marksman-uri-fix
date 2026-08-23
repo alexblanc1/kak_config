@@ -1,0 +1,154 @@
+#!/usr/bin/env python3
+"""Filtre les réponses de marksman pour percent-encoder les URI mal formées.
+
+Pourquoi ce script existe
+-------------------------
+marksman a deux façons de fabriquer une URI de fichier. Celle qui part d'une
+entrée du disque encode correctement ; celle qui part du texte d'un lien
+`[[...]]` encode les espaces mais **laisse les caractères non-ASCII bruts** :
+
+    file:///…/202507142151%20Epistémologie%20de%20la%20masse.md
+                             ^^^^^^^^^^^^ « é » non encodé
+
+kakoune-lsp 21.x s'appuie sur lsp-types 0.97, donc sur fluent-uri, strictement
+conforme à la RFC 3986 : un octet non-ASCII y est illégal. La désérialisation
+échoue, et `serde_json::from_value(...).expect(...)` dans src/context.rs:257
+panique — « data did not match any variant of untagged enum … ». Le serveur
+meurt, kakoune-lsp le relance, et ça recommence au lien suivant.
+
+Concrètement, sur un Zettelkasten francophone : tout lien dont la **cible** a un
+accent dans son nom de fichier fait tomber le LSP (aller à la définition,
+rétroliens, survol). Les deux bogues sont en amont — marksman devrait encoder,
+kakoune-lsp ne devrait pas paniquer — d'où ce rustine côté client.
+
+Ce que fait le script
+---------------------
+Il s'intercale sur la sortie de marksman, décadre les messages LSP, et
+percent-encode dans le JSON tout ce qui ressemble à une URI de fichier, aussi
+bien les valeurs que les clés (`WorkspaceEdit.changes` est un objet indexé par
+URI). Puis il recadre avec un Content-Length recalculé — l'en-tête compte des
+octets, et le ré-encodage allonge le message.
+
+L'encodage est volontairement minimal : seuls l'espace et les octets ≥ 0x80 sont
+traduits. Le `%` est laissé tel quel, donc repasser sur une URI déjà correcte ne
+la double-encode pas. macOS stocke les noms en NFD et APFS résout indifféremment
+NFC et NFD : peu importe la forme que marksman a produite, le fichier s'ouvre.
+
+Le sens client → serveur n'est pas touché : kakoune-lsp, lui, encode bien.
+
+Retrait : supprimer la ligne `command = …` du bloc [marksman] dans
+config/40-plugins.kak. Ce fichier redevient alors inerte.
+"""
+
+import json
+import os
+import subprocess
+import sys
+import threading
+
+
+def encode_uri(uri):
+    """Percent-encode l'espace et le non-ASCII, sans toucher au reste."""
+    out = []
+    for ch in uri:
+        if ch == " ":
+            out.append("%20")
+        elif ord(ch) > 0x7F:
+            out.extend("%%%02X" % b for b in ch.encode("utf-8"))
+        else:
+            out.append(ch)
+    return "".join(out)
+
+
+def fix(node):
+    """Réécrit récursivement toute chaîne — valeur ou clé — en file://…"""
+    if isinstance(node, str):
+        return encode_uri(node) if node.startswith("file://") else node
+    if isinstance(node, list):
+        return [fix(item) for item in node]
+    if isinstance(node, dict):
+        return {fix(key): fix(value) for key, value in node.items()}
+    return node
+
+
+def read_message(stream):
+    """Lit un message LSP encadré. Rend (en-têtes, corps) ou None en fin de flux."""
+    headers = {}
+    while True:
+        line = stream.readline()
+        if not line:
+            return None
+        if line in (b"\r\n", b"\n"):
+            break
+        if b":" in line:
+            name, _, value = line.partition(b":")
+            headers[name.strip().lower()] = value.strip()
+    length = int(headers.get(b"content-length", b"0"))
+    return headers, stream.read(length)
+
+
+def pump_responses(server_out, client_out):
+    while True:
+        message = read_message(server_out)
+        if message is None:
+            return
+        _, body = message
+        try:
+            payload = fix(json.loads(body))
+            body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        except (ValueError, UnicodeDecodeError):
+            pass  # Message illisible : on le relaie tel quel, au client de trancher.
+        client_out.write(b"Content-Length: %d\r\n\r\n" % len(body) + body)
+        client_out.flush()
+
+
+def pump_requests(client_fd, server_in):
+    """kakoune-lsp encode correctement : on recopie sans rien interpréter.
+
+    os.read et pas un flux bufferisé : celui-ci attendrait d'avoir ses 4 Kio
+    avant de relayer quoi que ce soit, et la poignée de main LSP resterait en
+    suspens — le serveur n'a rien à lire, le client attend sa réponse.
+    """
+    try:
+        while True:
+            chunk = os.read(client_fd, 65536)
+            if not chunk:
+                break
+            server_in.write(chunk)
+            server_in.flush()
+    except (BrokenPipeError, OSError, ValueError):
+        pass
+    finally:
+        try:
+            server_in.close()
+        except OSError:
+            pass
+
+
+def main():
+    marksman = os.environ.get("MARKSMAN_BIN", "marksman")
+    server = subprocess.Popen(
+        [marksman] + sys.argv[1:],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=None,  # hérité : les logs de marksman remontent dans *debug*
+    )
+
+    threading.Thread(
+        target=pump_requests,
+        args=(sys.stdin.fileno(), server.stdin),
+        daemon=True,
+    ).start()
+
+    try:
+        pump_responses(server.stdout, sys.stdout.buffer)
+    except BrokenPipeError:
+        pass
+    finally:
+        if server.poll() is None:
+            server.terminate()
+    sys.exit(server.wait())
+
+
+if __name__ == "__main__":
+    main()

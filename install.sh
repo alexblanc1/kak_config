@@ -127,4 +127,10 @@ fi
 command -v pylsp  >/dev/null 2>&1 || warn "pylsp absent : Python sans LSP ($HINT_PYLSP)"
 command -v marksman >/dev/null 2>&1 || warn "marksman absent : Markdown sans LSP ($HINT_MARKSMAN)"
 
+# marksman n'est pas lancé directement mais via bin/marksman-uri-fix, qui répare
+# ses URI accentuées (cf. l'en-tête du script). Sans python3, le serveur ne
+# démarre pas du tout — l'échec est muet côté Kakoune, d'où cet avertissement.
+command -v python3 >/dev/null 2>&1 \
+    || warn "python3 absent : Markdown sans LSP (bin/marksman-uri-fix ne peut pas tourner)"
+
 info "terminé — lance kak puis : :plugin-install"
