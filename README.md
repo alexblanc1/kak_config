@@ -83,7 +83,9 @@ kakrc                       entry point — only sources the modules
 │       └── linux.kak       Linux overrides    (versioned)
 │
 ├── local.kak               overrides for THIS machine (NOT versioned)
-├── bin/change-theme.pl     portable theme picker
+├── bin/
+│   ├── change-theme.pl     portable theme picker
+│   └── marksman-uri-fix    repairs the URIs marksman leaves malformed
 ├── install.sh              bootstrap
 │
 ├── autoload/               standard-library → symlink, not versioned
@@ -132,10 +134,19 @@ Symlinks are resolved by hand, with a `readlink` loop, rather than with
 | Assistant | `ncurses_assistant=dilbert` |
 | Modeline | `buffer-name line:column {context} {mode}` |
 | `toolsclient` / `jumpclient` | **empty, deliberately** |
+| Markdown extras | `[[wikilink]]` in `link`, `#tag` in `keyword` |
 
 > Leaving `toolsclient` and `jumpclient` empty keeps the tools (filetree, grep,
 > LSP…) in the current window instead of hunting for a tmux client that may well
 > not exist.
+
+> **Why Markdown gets two extra highlighters.** Neither `[[wikilink]]` nor `#tag`
+> belongs to standard Markdown, so the `markdown.kak` shipped with Kakoune has no
+> rule for them and leaves them in plain text colour — in a Zettelkasten, exactly
+> the two things that carry the structure of a note. The highlighters are added
+> after the filetype's own, so they paint over it; that is also what pulls `#tag`
+> out of markdown.kak's `^#\N*` rule, which reads any line starting with a hash
+> as a heading and so coloured a whole line of tags as one.
 
 ### `20-clipboard.kak` — system clipboard
 
@@ -303,7 +314,24 @@ marksman's project root.
 > contents) but loads no other file, so link completion, jumping to another note
 > and dead-link diagnostics are all silently gone. `config/40-plugins.kak` puts
 > the usual roots back. For a notes folder outside a git repository — a wiki, say
-> — an empty `.marksman.toml` at its root is enough to have it adopted.
+> — an empty `.marksman.toml` at its root is enough to have it adopted. Without
+> that marker marksman also treats every link as dead, which is how the URI bug
+> below reaches even a folder whose own name is plain ASCII.
+
+> **Why marksman runs behind a shim.** marksman builds file URIs two ways. The
+> one that starts from a directory entry encodes correctly; the one that starts
+> from the text of a `[[link]]` encodes spaces but leaves non-ASCII bytes raw.
+> kakoune-lsp reads URIs through fluent-uri, strict RFC 3986, where a raw
+> accented byte is illegal: the response fails to deserialise and the `.expect()`
+> at `src/context.rs:257` panics. The server dies, kakoune-lsp restarts it, and
+> it dies again on the next link. On a French notes folder that takes out
+> go-to-definition, backlinks and the code-action lightbulb alike — the last one
+> in a loop, since `lsp_auto_show_code_actions` asks on every idle.
+> `bin/marksman-uri-fix` sits on the server's output and percent-encodes what
+> marksman left raw, `Content-Length` recomputed. Both bugs are upstream —
+> marksman should encode, kakoune-lsp shouldn't panic — so this is a patch, not a
+> fix: drop the `command =` line from the `[marksman]` block to go back to the
+> bare server.
 
 > **texlab doesn't report diagnostics as you type.** It only produces them from a
 > build, which isn't enabled here so as not to duplicate `<c-w>`
@@ -323,6 +351,14 @@ marksman's project root.
 | `s` | go to a document symbol |
 
 The mode holds more than that; they show up in the infobox when you enter it.
+
+> **What those keys mean in a notes folder.** Backed by marksman, the generic LSP
+> actions read as Zettelkasten moves: `d` on a `[[link]]` opens the note it points
+> at — cursor on the link text, not on the opening bracket, which returns nothing
+> — `r` lists the notes linking *to* the current one, `o` searches titles across
+> the folder and `s` is the table of contents. Typing `[[` in insert mode
+> completes on note titles, so the identifiers never have to be remembered.
+> `<c-o>` / `<c-i>` walk the jump list back and forth.
 
 ### ctags — *if `ctags` is installed*
 
@@ -401,6 +437,13 @@ local.kak  →  config/40-plugins.kak  →  kakrc
 If none of them does, it appends the line to `local.kak` — outside the
 repository, leaving the shared config alone.
 
+> **Two faces are repainted after the colorscheme.** catppuccin renders `title`
+> as ordinary text in bold, and `header` — the face `markdown.kak` gives every
+> `# …` heading — in a grey lighter than the prose, so headings recede instead of
+> standing out. `config/40-plugins.kak` overrides both, right after the
+> `colorscheme` line since that command overwrites everything before it. A theme
+> switch keeps those two lines, so retune them if the new palette clashes.
+
 ---
 
 ## Optional dependencies
@@ -416,6 +459,7 @@ matching feature off.
 | `texlab` | LaTeX LSP | `brew install texlab` | `apt install texlab`, or `cargo install --locked texlab` |
 | `pylsp` | Python LSP | `pipx install "python-lsp-server[pyflakes,rope]"` | same |
 | `marksman` | Markdown LSP | `brew install marksman` | GitHub release binary (`artempyanykh/marksman`) |
+| `python3` | `bin/marksman-uri-fix`, so Markdown LSP at all | preinstalled | `apt install python3` |
 | `Skim` | LaTeX forward search (macOS) | `brew install --cask skim` | — (zathura, already the default) |
 | `ctags` | `<a-=>`, `<space>t` | `brew install universal-ctags` | `apt install universal-ctags` |
 | `fzf` | `change-theme.pl` | `brew install fzf` | `apt install fzf` |
