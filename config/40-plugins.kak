@@ -39,6 +39,33 @@ try %{
     # via clippy et les libellés de symboles. Le binaire est simplement cherché
     # dans le PATH — ici ~/.local/bin/rust-analyzer, installé à la main.
     evaluate-commands "do-if-%opt{has_lsp} lsp-enable"
+
+    # marksman : complétion et navigation entre notes Markdown, table des
+    # matières, diagnostics sur les liens cassés (brew install marksman).
+    #
+    # rc/servers.kak le déclare déjà, mais avec .marksman.toml pour seule racine
+    # de projet. Sans ce fichier, kakoune-lsp retombe sur le répertoire du
+    # fichier ouvert, que marksman rejette — « Workspace folder is bogus » dans
+    # *debug*. Le serveur continue de répondre sur le buffer courant (symboles,
+    # table des matières), mais ne charge aucun autre fichier : ni complétion de
+    # liens, ni saut vers une autre note, ni détection des liens morts.
+    #
+    # On lui donne donc les racines usuelles, celles que marksman reconnaît
+    # lui-même. Pour un dossier de notes hors dépôt git — un wiki, par exemple —
+    # un .marksman.toml vide à sa racine suffit à le faire adopter.
+    #
+    # Le hook du plugin est retiré, pas seulement doublé : chaque `set-option
+    # buffer lsp_servers` déclenche lsp-did-change-config, donc laisser les deux
+    # s'exécuter fait démarrer deux marksman — celui de la config d'origine, sur
+    # une racine que le serveur refuse, puis le nôtre.
+    remove-hooks global lsp-filetype-markdown
+    hook -group lsp-filetype-markdown global BufSetOption filetype=markdown %{
+        set-option buffer lsp_servers %{
+            [marksman]
+            root_globs = [".marksman.toml", ".git", ".hg"]
+            args = ["server"]
+        }
+    }
 } catch %{ echo -debug "plugin kakoune-lsp : %val{error}" }
 
 # Le plugin remplit tout le mode lsp (d définition, r références, h survol,

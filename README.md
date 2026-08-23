@@ -289,10 +289,21 @@ root.
 | Rust | `rust-analyzer` | `Cargo.toml` |
 | Python | `pylsp` | `pyproject.toml`, `setup.py`, `poetry.lock` or `.git` |
 | LaTeX | `texlab` | `.git` |
+| Markdown | `marksman` | `.marksman.toml`, `.git` or `.hg` |
 
 The settings come from the plugin's own `rc/servers.kak`, not from this
 repository, so there's nothing to maintain here as long as the defaults suit.
-Only texlab's PDF viewer is overridden, on macOS (see below).
+Two exceptions: texlab's PDF viewer, overridden on macOS (see below), and
+marksman's project root.
+
+> **Why marksman's root is widened.** `rc/servers.kak` accepts `.marksman.toml`
+> and nothing else. Without that file kakoune-lsp falls back to the directory of
+> the open file, which marksman then refuses — `Workspace folder is bogus` in
+> `*debug*`. The server still answers about the current buffer (symbols, table of
+> contents) but loads no other file, so link completion, jumping to another note
+> and dead-link diagnostics are all silently gone. `config/40-plugins.kak` puts
+> the usual roots back. For a notes folder outside a git repository — a wiki, say
+> — an empty `.marksman.toml` at its root is enough to have it adopted.
 
 > **texlab doesn't report diagnostics as you type.** It only produces them from a
 > build, which isn't enabled here so as not to duplicate `<c-w>`
@@ -404,6 +415,7 @@ matching feature off.
 | `rustowl` | Rust ownership (`<space>r`) | `curl -fsSL .../rustowl/main/install.sh \| sh` → `~/.rustowl` | same |
 | `texlab` | LaTeX LSP | `brew install texlab` | `apt install texlab`, or `cargo install --locked texlab` |
 | `pylsp` | Python LSP | `pipx install "python-lsp-server[pyflakes,rope]"` | same |
+| `marksman` | Markdown LSP | `brew install marksman` | GitHub release binary (`artempyanykh/marksman`) |
 | `Skim` | LaTeX forward search (macOS) | `brew install --cask skim` | — (zathura, already the default) |
 | `ctags` | `<a-=>`, `<space>t` | `brew install universal-ctags` | `apt install universal-ctags` |
 | `fzf` | `change-theme.pl` | `brew install fzf` | `apt install fzf` |

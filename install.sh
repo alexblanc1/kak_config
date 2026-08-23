@@ -96,11 +96,13 @@ case "$(uname)" in
         HINT_LSP='brew install kakoune-lsp'
         HINT_RA='release GitHub aarch64-apple-darwin, décompressée dans ~/.local/bin'
         HINT_TEXLAB='brew install texlab'
+        HINT_MARKSMAN='brew install marksman'
         ;;
     *)
         HINT_LSP='cargo install --locked kakoune-lsp'
         HINT_RA='rustup component add rust-analyzer'
         HINT_TEXLAB='apt install texlab, ou cargo install --locked texlab'
+        HINT_MARKSMAN='binaire de la release GitHub artempyanykh/marksman'
         ;;
 esac
 HINT_PYLSP='pipx install "python-lsp-server[pyflakes,rope]"'
@@ -123,5 +125,6 @@ if [ ! -x "$HOME/.rustowl/rustowl" ] && ! command -v rustowl >/dev/null 2>&1; th
     warn "  curl -fsSL https://raw.githubusercontent.com/cordx56/rustowl/main/install.sh | sh"
 fi
 command -v pylsp  >/dev/null 2>&1 || warn "pylsp absent : Python sans LSP ($HINT_PYLSP)"
+command -v marksman >/dev/null 2>&1 || warn "marksman absent : Markdown sans LSP ($HINT_MARKSMAN)"
 
 info "terminé — lance kak puis : :plugin-install"
