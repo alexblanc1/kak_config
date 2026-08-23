@@ -76,6 +76,30 @@ try %{
             args = ['server']
         "
     }
+
+    # <ret> suit le lien Markdown sous le curseur — [[wikilink]] comme
+    # [texte](note.md) — au lieu de passer par le mode lsp (<space> l d).
+    # C'est la même requête textDocument/definition : marksman résout la cible,
+    # kakoune-lsp ouvre le buffer. Curseur n'importe où dans le lien.
+    #
+    # Le mapping est posé fenêtre par fenêtre, et seulement sur les buffers
+    # Markdown : <ret> n'a pas d'action par défaut en mode normal, mais les
+    # buffers spéciaux (*grep*, *make*, *filetree*, *lsp-goto*) le remappent
+    # pour ouvrir la ligne sous le curseur, et un `map global` les écraserait.
+    # Le hook -once -always le retire si la fenêtre change de filetype.
+    #
+    # Conditionné à has_lsp : sans binaire kakoune-lsp, lsp-enable n'a pas
+    # tourné et la requête retomberait sur `grep <mot sous le curseur>`, qui
+    # ouvrirait un buffer *grep* à chaque pression sur entrée.
+    define-command -hidden markdown-follow-link-setup %{
+        hook global WinSetOption filetype=markdown %{
+            map window normal <ret> ': lsp-definition<ret>' -docstring 'suivre le lien sous le curseur'
+            hook -once -always window WinSetOption filetype=.* %{
+                unmap window normal <ret> ': lsp-definition<ret>'
+            }
+        }
+    }
+    evaluate-commands "do-if-%opt{has_lsp} markdown-follow-link-setup"
 } catch %{ echo -debug "plugin kakoune-lsp : %val{error}" }
 
 # Le plugin remplit tout le mode lsp (d définition, r références, h survol,

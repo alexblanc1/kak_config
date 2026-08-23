@@ -238,6 +238,7 @@ exactly what happens on a fresh machine.
 | `<space>f` | normal | open **filetree** |
 | `<space>l` | normal | enter **LSP** mode |
 | `<space>r` | normal | **RustOwl** — underline ownership under the cursor |
+| `<ret>` | normal | follow the Markdown link under the cursor (Markdown buffers only) |
 
 ### Buffers (kakoune-buffers)
 
@@ -359,6 +360,17 @@ The mode holds more than that; they show up in the infobox when you enter it.
 > the folder and `s` is the table of contents. Typing `[[` in insert mode
 > completes on note titles, so the identifiers never have to be remembered.
 > `<c-o>` / `<c-i>` walk the jump list back and forth.
+
+> **`<ret>` follows a link.** Since `d` is the one of those used constantly,
+> Markdown buffers also get it on a single key: `<ret>` in normal mode runs the
+> same `lsp-definition`, on a `[[wikilink]]` as on a `[text](note.md)`. The
+> mapping is set per window by a `filetype=markdown` hook and dropped again if
+> the window changes filetype, so it never reaches the special buffers —
+> `*grep*`, `*make*`, `*filetree*`, `*lsp-goto*` — that bind `<ret>` to open the
+> line under the cursor. Off a link it does nothing. It is wired only when
+> `%opt{has_lsp}` is true: with no kakoune-lsp binary, `lsp-enable` never ran and
+> the request would fall back to `grep <word under the cursor>`, popping a
+> `*grep*` buffer on every press of the return key.
 
 ### ctags — *if `ctags` is installed*
 
