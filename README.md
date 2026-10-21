@@ -160,6 +160,9 @@ xclip                     (X11, fallback)
 ```
 
 - A `RegisterModified '"'` hook pushes **every yank** to the system clipboard.
+  Its output goes to `/dev/null`: xclip, xsel and wl-copy fork into the
+  background to serve the selection, and an open stdout would make Kakoune
+  hang on "waiting for shell command to finish" after every `d`, `c` or `y`.
 - `<space>p` / `<space>P` paste from the system clipboard; Kakoune's own `p` /
   `P` are untouched.
 - If nothing is found, the commands fail cleanly with a message instead of
