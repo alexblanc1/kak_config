@@ -34,9 +34,12 @@ evaluate-commands %sh{
 }
 
 # Tout yank part vers le presse-papier système, comme sur le ThinkPad.
+# xclip, xsel et wl-copy restent en arrière-plan pour servir la sélection :
+# sans redirection, ils gardent ouverte la sortie de %sh{} et Kakoune se fige
+# sur "waiting for shell command to finish" à chaque d, c ou y.
 hook global RegisterModified '"' %{ nop %sh{
     [ -n "$kak_opt_clipboard_copy" ] || exit 0
-    printf %s "$kak_main_reg_dquote" | eval "$kak_opt_clipboard_copy"
+    printf %s "$kak_main_reg_dquote" | eval "$kak_opt_clipboard_copy" >/dev/null 2>&1
 }}
 
 define-command clipboard-paste-after -docstring "coller le presse-papier système après la sélection" %{
